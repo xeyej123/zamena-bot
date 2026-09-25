@@ -10,4 +10,3 @@ services:
         sync: false
       - key: GROUP_NAME
         value: КС-3-1
-        sync: false
