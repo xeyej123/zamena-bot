@@ -2,11 +2,16 @@ name: Check zamena
 
 on:
   schedule:
-    # 8:00 по Москве (UTC+3) = 5:00 UTC — ежедневная сводка, шлётся всегда
     - cron: "0 5 * * *"
-    # каждый час с 9:00 до 20:00 по Москве (6:00-17:00 UTC) — шлёт, только если PDF изменился
     - cron: "0 6-17 * * *"
-  workflow_dispatch: {}   # позволяет запускать вручную кнопкой на GitHub
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: check-zamena
+  cancel-in-progress: false
 
 jobs:
   check:
@@ -25,7 +30,9 @@ jobs:
 
       - name: Determine mode
         run: |
-          if [ "${{ github.event.schedule }}" == "0 5 * * *" ]; then
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "MODE=manual" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" == "0 5 * * *" ]; then
             echo "MODE=daily" >> $GITHUB_ENV
           else
             echo "MODE=check" >> $GITHUB_ENV
