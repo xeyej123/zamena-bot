@@ -1,0 +1,36 @@
+name: Check zamena
+
+on:
+  schedule:
+    # 12:10 и 16:10 по Москве (UTC+3) = 09:10 и 13:10 UTC
+    - cron: "10 9 * * *"
+    - cron: "10 13 * * *"
+  workflow_dispatch: {}   # позволяет запускать вручную кнопкой на GitHub
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run check
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          GROUP_NAME: "КС-3-1"
+        run: python check_zamena.py
+
+      - name: Save hash state
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Обновление хэша последнего PDF"
+          file_pattern: last_hash.txt
