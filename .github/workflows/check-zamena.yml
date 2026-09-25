@@ -2,9 +2,10 @@ name: Check zamena
 
 on:
   schedule:
-    # 12:10 и 16:10 по Москве (UTC+3) = 09:10 и 13:10 UTC
-    - cron: "10 9 * * *"
-    - cron: "10 13 * * *"
+    # 8:00 по Москве (UTC+3) = 5:00 UTC — ежедневная сводка, шлётся всегда
+    - cron: "0 5 * * *"
+    # каждый час с 9:00 до 20:00 по Москве (6:00-17:00 UTC) — шлёт, только если PDF изменился
+    - cron: "0 6-17 * * *"
   workflow_dispatch: {}   # позволяет запускать вручную кнопкой на GitHub
 
 jobs:
@@ -21,6 +22,14 @@ jobs:
 
       - name: Install dependencies
         run: pip install -r requirements.txt
+
+      - name: Determine mode
+        run: |
+          if [ "${{ github.event.schedule }}" == "0 5 * * *" ]; then
+            echo "MODE=daily" >> $GITHUB_ENV
+          else
+            echo "MODE=check" >> $GITHUB_ENV
+          fi
 
       - name: Run check
         env:
