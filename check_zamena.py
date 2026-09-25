@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import hashlib
 import requests
 import pdfplumber
@@ -9,14 +10,25 @@ from io import BytesIO
 BOT_TOKEN = os.environ["BOT_TOKEN"]          # токен от BotFather
 CHAT_ID = os.environ["CHAT_ID"]              # твой chat_id (узнать через get_chat_id.py)
 GROUP_NAME = os.environ.get("GROUP_NAME", "КС-3-1")  # твоя группа, можно поменять
+MODE = os.environ.get("MODE", "check")  # "daily"/"manual" — шлёт всегда, "check" — только при изменениях
 
 PDF_URL = "https://ttgt.org/images/pdf/zamena.pdf"
 HASH_FILE = "last_hash.txt"  # чтобы не слать одно и то же уведомление повторно
 
+# кнопка в чате бота — постоянная клавиатура
+KEYBOARD = {
+    "keyboard": [[{"text": "🔄 Проверить замены"}]],
+    "resize_keyboard": True,
+}
+
 
 def send_message(text: str):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    resp = requests.post(url, data={"chat_id": CHAT_ID, "text": text})
+    resp = requests.post(url, data={
+        "chat_id": CHAT_ID,
+        "text": text,
+        "reply_markup": json.dumps(KEYBOARD),
+    })
     resp.raise_for_status()
 
 
@@ -59,12 +71,23 @@ def save_last_hash(h: str):
         f.write(h)
 
 
+def build_message(matches: list[str]) -> str:
+    always_send = MODE != "check"  # daily и manual всегда шлют сводку
+    if matches:
+        prefix = "⚠️ Замены на сегодня" if always_send else "⚠️ Появились новые замены"
+        return f"{prefix} для группы {GROUP_NAME}:\n\n" + "\n\n".join(matches)
+    if always_send:
+        return f"На сегодня замен для группы {GROUP_NAME} нет — можно выдохнуть."
+    return f"Файл замен обновился, но твоей группы {GROUP_NAME} в списке нет — можно выдохнуть."
+
+
 def main():
     pdf_bytes = download_pdf()
     current_hash = hashlib.sha256(pdf_bytes).hexdigest()
     last_hash = load_last_hash()
+    changed = current_hash != last_hash
 
-    if current_hash == last_hash:
+    if MODE == "check" and not changed:
         print("PDF не изменился с прошлой проверки — ничего не делаем.")
         return
 
@@ -73,11 +96,7 @@ def main():
     full_text = extract_text(pdf_bytes)
     matches = find_group_lines(full_text, GROUP_NAME)
 
-    if matches:
-        message = f"⚠️ Найдены замены для группы {GROUP_NAME}:\n\n" + "\n\n".join(matches)
-    else:
-        message = f"Файл замен обновился, но твоей группы {GROUP_NAME} в списке нет — можно выдохнуть."
-
+    message = build_message(matches)
     send_message(message)
     print(message)
 
