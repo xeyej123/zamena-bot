@@ -1,2 +1,4 @@
 requests
 pdfplumber
+flask
+gunicorn

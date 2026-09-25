@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: zamena-bot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: GROUP_NAME
+        value: КС-3-1
+        sync: false

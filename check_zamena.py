@@ -7,8 +7,8 @@ import pdfplumber
 from io import BytesIO
 
 # ====== НАСТРОЙКИ (берутся из переменных окружения / GitHub Secrets) ======
-BOT_TOKEN = os.environ["BOT_TOKEN"]          # токен от BotFather
-CHAT_ID = os.environ["CHAT_ID"]              # твой chat_id (узнать через get_chat_id.py)
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")  # токен от BotFather
+CHAT_ID = os.environ.get("CHAT_ID", "")      # твой chat_id (узнать через get_chat_id.py)
 GROUP_NAME = os.environ.get("GROUP_NAME", "КС-3-1")  # твоя группа, можно поменять
 MODE = os.environ.get("MODE", "check")  # "daily"/"manual" — шлёт всегда, "check" — только при изменениях
 
@@ -71,14 +71,26 @@ def save_last_hash(h: str):
         f.write(h)
 
 
-def build_message(matches: list[str]) -> str:
-    always_send = MODE != "check"  # daily и manual всегда шлют сводку
+def build_message(matches: list[str], group: str = "", always_send: bool = True) -> str:
+    group = group or GROUP_NAME
     if matches:
         prefix = "⚠️ Замены на сегодня" if always_send else "⚠️ Появились новые замены"
-        return f"{prefix} для группы {GROUP_NAME}:\n\n" + "\n\n".join(matches)
+        return f"{prefix} для группы {group}:\n\n" + "\n\n".join(matches)
     if always_send:
-        return f"На сегодня замен для группы {GROUP_NAME} нет — можно выдохнуть."
-    return f"Файл замен обновился, но твоей группы {GROUP_NAME} в списке нет — можно выдохнуть."
+        return f"На сегодня замен для группы {group} нет — можно выдохнуть."
+    return f"Файл замен обновился, но твоей группы {group} в списке нет — можно выдохнуть."
+
+
+def check_now(group: str = "") -> str:
+    """Проверяет замены прямо сейчас и возвращает готовый текст уведомления.
+
+    Используется ботом (bot.py) по нажатию кнопки: всегда возвращает сводку
+    и не трогает файл last_hash.txt (его ведёт планировщик GitHub Actions).
+    """
+    pdf_bytes = download_pdf()
+    full_text = extract_text(pdf_bytes)
+    matches = find_group_lines(full_text, group or GROUP_NAME)
+    return build_message(matches, group=group, always_send=True)
 
 
 def main():
@@ -96,7 +108,7 @@ def main():
     full_text = extract_text(pdf_bytes)
     matches = find_group_lines(full_text, GROUP_NAME)
 
-    message = build_message(matches)
+    message = build_message(matches, always_send=(MODE != "check"))
     send_message(message)
     print(message)
 

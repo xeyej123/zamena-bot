@@ -1,0 +1,45 @@
+name: Check zamena
+
+on:
+  schedule:
+    # 8:00 по Москве (UTC+3) = 5:00 UTC — ежедневная сводка, шлётся всегда
+    - cron: "0 5 * * *"
+    # каждый час с 9:00 до 20:00 по Москве (6:00-17:00 UTC) — шлёт, только если PDF изменился
+    - cron: "0 6-17 * * *"
+  workflow_dispatch: {}   # позволяет запускать вручную кнопкой на GitHub
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Determine mode
+        run: |
+          if [ "${{ github.event.schedule }}" == "0 5 * * *" ]; then
+            echo "MODE=daily" >> $GITHUB_ENV
+          else
+            echo "MODE=check" >> $GITHUB_ENV
+          fi
+
+      - name: Run check
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          GROUP_NAME: "КС-3-1"
+        run: python check_zamena.py
+
+      - name: Save hash state
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Обновление хэша последнего PDF"
+          file_pattern: last_hash.txt
